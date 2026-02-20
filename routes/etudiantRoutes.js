@@ -11,7 +11,8 @@ const {
     deleteEtudiant,
     getEtudiantsByFiliere,
     searchEtudiants,
-    getEtudiantsDesactives
+    getEtudiantsDesactives,
+    getEtudiantsSorted
 } = require('../controllers/etudiantController');
 
 // ============================================
@@ -31,6 +32,8 @@ router.route('/')
 router.get('/search', searchEtudiants);
 // Route pour récupérer les étudiants désactivés
 router.get('/desactives', getEtudiantsDesactives);
+// Route pour récupérer les étudiants triés par moyenne décroissante
+router.get('/sorted/moyenne', getEtudiantsSorted);
 router.get('/filiere/:filiere', getEtudiantsByFiliere);
 
 // Route: /api/etudiants/:id
