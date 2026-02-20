@@ -35,7 +35,7 @@ app.use(express.json());
 // Route d'accueil - pour tester que le serveur fonctionne
 app.get('/', (req, res) => {
     res.json({
-        message: '🎓 Bienvenue sur l\'API de gestion des étudiants! ',
+        message: '🎓 Bienvenue sur lAPI Scolaire v2.0 - par Bob ',
         version: '1.0.0',
         endpoints: {
             listeEtudiants: 'GET /api/etudiants',
