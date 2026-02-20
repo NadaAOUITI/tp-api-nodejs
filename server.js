@@ -1,6 +1,8 @@
 // ============================================
 // IMPORTS
 // ============================================
+
+// Serveur Express principal - Application Express
 const express = require('express');
 const dotenv = require('dotenv');
 const connectDB = require('./config/database');
@@ -45,6 +47,16 @@ app.get('/', (req, res) => {
         }
     });
 });
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+    res.status(200).json({
+        status: 'OK',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+    });
+});
+
 
 // Monter les routes des étudiants sur /api/etudiants
 app.use('/api/etudiants', require('./routes/etudiantRoutes'));
