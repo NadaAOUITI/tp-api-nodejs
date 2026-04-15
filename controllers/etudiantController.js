@@ -1,312 +1,195 @@
-// Importer le modèle Etudiant
+const mongoose = require('mongoose');
 const Etudiant = require('../models/Etudiant');
 
-// Les fonctions CRUD seront ajoutées ici...
+function escapeRegex(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
-// CREATE - Créer un nouvel étudiant
-// ============================================
-// Route:  POST /api/etudiants
-// Cette fonction reçoit les données d'un étudiant dans le body
-// de la requête et les enregistre dans la base de données. 
-
+// CREATE
 exports.createEtudiant = async (req, res) => {
     try {
-        // Étape 1: Récupérer les données envoyées par le client
-        // req.body contient les données JSON envoyées
-        console.log('📥 Données reçues:', req.body);
-        // Étape 2: Empêcher la création si un étudiant avec le même
-        // nom ET prénom existe déjà
-        const { nom, prenom } = req.body;
-        if (nom && prenom) {
-            const deja = await Etudiant.findOne({ nom: nom, prenom: prenom });
-            if (deja) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Un étudiant avec ce nom et ce prénom existe déjà'
-                });
-            }
+        const { nom, prenom, moyenne } = req.body;
+
+        if (!nom || !prenom) {
+            return res.status(400).json({ message: 'Le nom et le prénom sont obligatoires' });
+        }
+        if (moyenne !== undefined && typeof moyenne !== 'number') {
+            return res.status(400).json({ message: 'La moyenne doit être un nombre' });
+        }
+        if (moyenne !== undefined && (moyenne < 0 || moyenne > 20)) {
+            return res.status(400).json({ message: 'La moyenne doit être comprise entre 0 et 20' });
         }
 
-        // Étape 3: Créer l'étudiant dans la base de données
-        // Mongoose valide automatiquement les données selon le schéma
-        const etudiant = await Etudiant.create(req.body);
-        
-        // Étape 3: Renvoyer une réponse de succès (code 201 = Created)
-        res.status(201).json({
-            success: true,
-            message: 'Étudiant créé avec succès',
-            data: etudiant
-        });
-        
-    } catch (error) {
-        // Gestion des erreurs
-        
-        // Erreur de doublon (email déjà existant)
-        if (error.code === 11000) {
-            return res.status(400).json({
-                success: false,
-                message: 'Cet email existe déjà'
-            });
+        // Empêcher doublon nom + prénom
+        const deja = await Etudiant.findOne({ nom, prenom });
+        if (deja) {
+            return res.status(400).json({ message: 'Un étudiant avec ce nom et ce prénom existe déjà' });
         }
-        
-        // Autres erreurs (validation, etc.)
-        res.status(400).json({
-            success: false,
-            message: 'Données invalides',
-            error: error.message
-        });
+
+        const etudiant = new Etudiant(req.body);
+        await etudiant.save();
+        res.status(201).json(etudiant);
+    } catch (error) {
+        if (error.code === 11000) {
+            return res.status(409).json({ message: 'Cet email existe déjà' });
+        }
+        res.status(400).json({ message: error.message });
     }
 };
-// ============================================
-// READ ALL - Récupérer tous les étudiants
-// ============================================
-// Route: GET /api/etudiants
-// Cette fonction retourne la liste complète des étudiants.
 
+// READ ALL
 exports.getAllEtudiants = async (req, res) => {
     try {
-        // Étape 1: Récupérer tous les documents actifs de la collection
-        // Seuls les étudiants avec `actif: true` sont retournés
         const etudiants = await Etudiant.find({ actif: true });
-        
-        // Étape 2: Renvoyer la liste avec le nombre total
-        res.status(200).json({
-            success: true,
-            count: etudiants.length,  // Nombre d'étudiants trouvés
-            data: etudiants
-        });
-        
+        res.status(200).json(etudiants);
     } catch (error) {
-        // Erreur serveur (code 500)
-        res.status(500).json({
-            success: false,
-            message: 'Erreur serveur',
-            error: error.message
-        });
+        res.status(500).json({ message: 'Erreur serveur', error: error.message });
     }
 };
-// ============================================
-// READ ONE - Récupérer un étudiant par son ID
-// ============================================
-// Route: GET /api/etudiants/:id
-// Le : id dans l'URL est un paramètre dynamique. 
-// Exemple:  GET /api/etudiants/507f1f77bcf86cd799439011
 
+// READ ONE
 exports.getEtudiantById = async (req, res) => {
     try {
-        // Étape 1: Récupérer l'ID depuis les paramètres de l'URL
-        // req.params contient les paramètres de l'URL
-        console.log('🔍 Recherche de l\'ID:', req.params.id);
-        
-        // Étape 2: Chercher l'étudiant par son ID
-        const etudiant = await Etudiant.findById(req.params.id);
-        
-        // Étape 3: Vérifier si l'étudiant existe
-        if (!etudiant) {
-            return res.status(404).json({
-                success: false,
-                message: 'Étudiant non trouvé'
-            });
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ message: 'ID invalide' });
         }
-        
-        // Étape 4: Renvoyer l'étudiant trouvé
-        res.status(200).json({
-            success: true,
-            data: etudiant
-        });
-        
+        const etudiant = await Etudiant.findById(req.params.id);
+        if (!etudiant) {
+            return res.status(404).json({ message: 'Étudiant non trouvé' });
+        }
+        res.status(200).json(etudiant);
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Erreur serveur',
-            error: error.message
-        });
+        res.status(500).json({ message: 'Erreur serveur', error: error.message });
     }
 };
-// ============================================
-// UPDATE - Mettre à jour un étudiant
-// ============================================
-// Route: PUT /api/etudiants/:id
-// Cette fonction modifie les champs d'un étudiant existant.
 
+// UPDATE
 exports.updateEtudiant = async (req, res) => {
     try {
-        console.log('✏️ Mise à jour de l\'ID:', req.params.id);
-        console.log('📥 Nouvelles données:', req.body);
-        
-        // findByIdAndUpdate prend 3 arguments: 
-        // 1. L'ID du document à modifier
-        // 2. Les nouvelles données
-        // 3. Options:  
-        //    - new: true = retourne le document modifié (pas l'ancien)
-        //    - runValidators: true = applique les validations du schéma
-        
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ message: 'ID invalide' });
+        }
         const etudiant = await Etudiant.findByIdAndUpdate(
-            req.params. id,
+            req.params.id,
             req.body,
             { new: true, runValidators: true }
         );
-        
-        // Vérifier si l'étudiant existe
         if (!etudiant) {
-            return res.status(404).json({
-                success: false,
-                message: 'Étudiant non trouvé'
-            });
+            return res.status(404).json({ message: 'Étudiant non trouvé' });
         }
-        
-        res.status(200).json({
-            success: true,
-            message: 'Étudiant mis à jour avec succès',
-            data: etudiant
-        });
-        
+        res.status(200).json(etudiant);
     } catch (error) {
-        res.status(400).json({
-            success: false,
-            message: 'Erreur de mise à jour',
-            error: error.message
-        });
+        res.status(400).json({ message: error.message });
     }
 };
-// ============================================
-// DELETE - Supprimer un étudiant
-// ============================================
-// Route: DELETE /api/etudiants/:id
-// Cette fonction supprime définitivement un étudiant. 
 
+// DELETE (soft)
 exports.deleteEtudiant = async (req, res) => {
     try {
-        console.log('🗑️ Suppression de l\'ID:', req.params.id);
-        
-        // Suppression douce: on met `actif: false` au lieu de supprimer
-        const etudiant = await Etudiant.findByIdAndUpdate(
-            req.params.id,
-            { actif: false },
-            { new: true }
-        );
-
-        // Vérifier si l'étudiant existait
-        if (!etudiant) {
-            return res.status(404).json({
-                success: false,
-                message: 'Étudiant non trouvé'
-            });
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ message: 'ID invalide' });
         }
-
-        res.status(200).json({
-            success: true,
-            message: 'Étudiant désactivé avec succès',
-            data: etudiant
-        });
-        
+        const etudiant = await Etudiant.findByIdAndDelete(req.params.id);
+        if (!etudiant) {
+            return res.status(404).json({ message: 'Étudiant non trouvé' });
+        }
+        res.status(200).json({ message: 'Étudiant supprimé avec succès' });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Erreur serveur',
-            error: error. message
-        });
+        res.status(500).json({ message: 'Erreur serveur', error: error.message });
     }
 };
-// ============================================
-// SEARCH - Rechercher des étudiants par filière
-// ============================================
-// Route:  GET /api/etudiants/filiere/:filiere
-// Exemple: GET /api/etudiants/filiere/Informatique
 
+// BY FILIERE
 exports.getEtudiantsByFiliere = async (req, res) => {
     try {
-        console.log('🔎 Recherche par filière:', req.params.filiere);
-        
-        // Chercher tous les étudiants avec cette filière
-        const etudiants = await Etudiant. find({ filiere: req.params.filiere });
-        
-      res.status(200).json({
-            success: true,
-            count: etudiants.length,
-            filiere: req.params.filiere,
-            data: etudiants
-        });
-        
+        const etudiants = await Etudiant.find({ filiere: req.params.filiere });
+        res.status(200).json({ success: true, count: etudiants.length, filiere: req.params.filiere, data: etudiants });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Erreur serveur',
-            error: error. message
-        });
+        res.status(500).json({ message: 'Erreur serveur', error: error.message });
     }
-}
+};
 
-// ============================================
-// READ DISABLED - Récupérer les étudiants désactivés
-// ============================================
-// Route: GET /api/etudiants/desactives
+// DESACTIVES
 exports.getEtudiantsDesactives = async (req, res) => {
     try {
-        // Récupérer les étudiants avec actif: false
         const etudiants = await Etudiant.find({ actif: false });
-
-        res.status(200).json({
-            success: true,
-            count: etudiants.length,
-            data: etudiants
-        });
-
+        res.status(200).json({ success: true, count: etudiants.length, data: etudiants });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Erreur serveur',
-            error: error.message
-        });
+        res.status(500).json({ message: 'Erreur serveur', error: error.message });
     }
-}
+};
 
-// ============================================
-// SEARCH - Rechercher des étudiants par nom ou prénom
-// ============================================
-// Route: GET /api/etudiants/search?q=ahmed
-// Recherche insensible à la casse dans le `nom` OU le `prenom`.
+// SEARCH (?nom= pour filtrer sur le nom, ?q= pour nom ou prénom — insensible à la casse)
 exports.searchEtudiants = async (req, res) => {
     try {
+        const nomParam = req.query.nom;
         const q = req.query.q;
 
-        if (!q || q.trim().length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'Paramètre de recherche manquant. Utilisez ?q=mot'
+        if (nomParam !== undefined && String(nomParam).trim().length > 0) {
+            const nom = String(nomParam).trim();
+            const regex = new RegExp(escapeRegex(nom), 'i');
+            const etudiants = await Etudiant.find({ nom: regex });
+            return res.status(200).json({
+                success: true,
+                count: etudiants.length,
+                query: { nom },
+                data: etudiants
             });
         }
 
-        const regex = new RegExp(q, 'i'); // insensible à la casse
-
-        const etudiants = await Etudiant.find({
-            $or: [
-                { nom: regex },
-                { prenom: regex }
-            ]
-        });
-
-        res.status(200).json({
-            success: true,
-            count: etudiants.length,
-            query: q,
-            data: etudiants
-        });
-
+        if (!q || String(q).trim().length === 0) {
+            return res.status(400).json({
+                message: 'Paramètre de recherche manquant. Utilisez ?q=mot ou ?nom=nom'
+            });
+        }
+        const regex = new RegExp(escapeRegex(String(q).trim()), 'i');
+        const etudiants = await Etudiant.find({ $or: [{ nom: regex }, { prenom: regex }] });
+        res.status(200).json({ success: true, count: etudiants.length, query: q, data: etudiants });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Erreur serveur',
-            error: error.message
-        });
+        res.status(500).json({ message: 'Erreur serveur', error: error.message });
     }
-}
-// Recherche avancée avec filtres multiples
+};
+
+// STATISTIQUES (étudiants actifs uniquement)
+exports.getEtudiantsStats = async (req, res) => {
+    try {
+        const result = await Etudiant.aggregate([
+            { $match: { actif: true } },
+            {
+                $group: {
+                    _id: null,
+                    count: { $sum: 1 },
+                    moyenne_generale: { $avg: '$moyenne' },
+                    min: { $min: '$moyenne' },
+                    max: { $max: '$moyenne' }
+                }
+            }
+        ]);
+        if (!result.length || result[0].count === 0) {
+            return res.status(200).json({
+                count: 0,
+                moyenne_generale: null,
+                min: null,
+                max: null
+            });
+        }
+        const s = result[0];
+        res.status(200).json({
+            count: s.count,
+            moyenne_generale: s.moyenne_generale,
+            min: s.min,
+            max: s.max
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Erreur serveur', error: error.message });
+    }
+};
+
+// ADVANCED SEARCH
 exports.advancedSearch = async (req, res) => {
     try {
         const { nom, filiere, anneeMin, anneeMax, moyenneMin } = req.query;
         let filter = { actif: true };
-
         if (nom) filter.nom = new RegExp(nom, 'i');
         if (filiere) filter.filiere = filiere;
         if (anneeMin || anneeMax) {
@@ -315,42 +198,19 @@ exports.advancedSearch = async (req, res) => {
             if (anneeMax) filter.annee.$lte = parseInt(anneeMax);
         }
         if (moyenneMin) filter.moyenne = { $gte: parseFloat(moyenneMin) };
-
         const etudiants = await Etudiant.find(filter);
-
-        res.status(200).json({
-            success: true,
-            count: etudiants.length,
-            filters: req.query,
-            data: etudiants
-        });
+        res.status(200).json({ success: true, count: etudiants.length, filters: req.query, data: etudiants });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Erreur serveur',
-            error: error.message
-        });
+        res.status(500).json({ message: 'Erreur serveur', error: error.message });
     }
 };
 
-// ============================================
-// SORTED - Récupérer les étudiants triés par moyenne décroissante
-// ============================================
-// Route: GET /api/etudiants/sorted/moyenne
+// SORTED BY MOYENNE DESC
 exports.getEtudiantsSorted = async (req, res) => {
     try {
         const etudiants = await Etudiant.find({ actif: true }).sort({ moyenne: -1 });
-        
-        res.status(200).json({
-            success: true,
-            count: etudiants.length,
-            data: etudiants
-        });
+        res.status(200).json({ success: true, count: etudiants.length, data: etudiants });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Erreur serveur',
-            error: error.message
-        });
+        res.status(500).json({ message: 'Erreur serveur', error: error.message });
     }
 };
