@@ -11,6 +11,7 @@ const {
     deleteEtudiant,
     getEtudiantsByFiliere,
     searchEtudiants,
+    getEtudiantsStats,
     getEtudiantsDesactives,
     getEtudiantsSorted
 } = require('../controllers/etudiantController');
@@ -28,8 +29,9 @@ router.route('/')
 
 // ⚠️ IMPORTANT:  Cette route DOIT être avant /: id
 // Sinon "filiere" serait interprété comme un ID
-// Route de recherche: /api/etudiants/search?q=...
+// Route de recherche: /api/etudiants/search?q=... ou ?nom=...
 router.get('/search', searchEtudiants);
+router.get('/stats', getEtudiantsStats);
 // Route pour récupérer les étudiants désactivés
 router.get('/desactives', getEtudiantsDesactives);
 // Route pour récupérer les étudiants triés par moyenne décroissante
